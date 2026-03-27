@@ -365,8 +365,8 @@ textarea{resize:vertical;min-height:60px;}
       <label>
         <span class="lbl">QR-Größe (px)</span>
         <select id="qrsize">
-          <option value="160">Klein (160 px)</option>
-          <option value="200" selected>Mittel (200 px)</option>
+          <option value="160" selected>Klein (160 px)</option>
+          <option value="200">Mittel (200 px)</option>
           <option value="256">Groß (256 px)</option>
           <option value="320">Sehr groß (320 px)</option>
         </select>
@@ -823,8 +823,7 @@ function downloadPNG() {
 
   // Download (Ausgabe in nativer Auflösung = scharf)
   var link = document.createElement('a');
-  var name = 'epc-' + f.name.replace(/[^a-z0-9]/gi,'-').toLowerCase() + '.png';
-  link.download = name;
+  link.download = 'Überweisungsdaten.png';
   link.href = out.toDataURL('image/png');
   link.click();
 }
