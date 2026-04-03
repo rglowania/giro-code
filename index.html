@@ -764,14 +764,24 @@ function downloadPNG() {
   if (f.bic)        lines.push({ label: 'BIC',      value: f.bic });
 
   // Layout (logische Pixel)
-  var pad     = 14;           // schmaler Seitenrand
-  var sepH    = 12;           // Abstand QR → Trennlinie
-  var lineH   = 16;           // Zeilenhöhe
-  var labelW  = 68;           // Breite Label-Spalte
-  var headerH = 20;           // Überschrift-Zeile
+  var pad     = 14;
+  var sepH    = 12;
+  var lineH   = 16;
+  var labelW  = 68;
+  var headerH = 20;
   var footerH = 16;
   var textBlockH = headerH + lines.length * lineH + 8;
-  var totalW  = qrSize + pad * 2;
+
+  // Breite: max(QR-Größe, längster Text) + Rand
+  var measureCanvas = document.createElement('canvas');
+  var mctx = measureCanvas.getContext('2d');
+  mctx.font = '9px "Courier New", monospace';
+  var maxTextW = mctx.measureText('SEPA ÜBERWEISUNG  ·  GiroCode').width;
+  lines.forEach(function(row) {
+    var w = labelW + mctx.measureText(row.value).width;
+    if (w > maxTextW) maxTextW = w;
+  });
+  var totalW  = Math.max(qrSize, Math.ceil(maxTextW)) + pad * 2;
   var totalH  = pad + qrSize + sepH + 1 + 8 + textBlockH + footerH + pad;
 
   // HiDPI: 3× für scharfe Ausgabe
