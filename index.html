@@ -398,7 +398,7 @@ textarea{resize:vertical;min-height:60px;}
       <div id="qr-canvas"></div>
       <div id="qr-info" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-muted);text-align:center;"></div>
       <div class="dl-row">
-        <button class="btn-secondary" onclick="downloadPNG()">↓ PNG herunterladen</button>
+        <button class="btn-secondary" onclick="showImage()">↓ Bild speichern / herunterladen</button>
         <button class="btn-secondary" onclick="copyRaw()">⎘ EPC-String kopieren</button>
       </div>
     </div>
@@ -408,6 +408,16 @@ textarea{resize:vertical;min-height:60px;}
     </div>
   </div>
 
+</div>
+
+<!-- BILD-MODAL -->
+<div id="img-modal" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,0.82);align-items:center;justify-content:center;flex-direction:column;padding:20px;">
+  <div style="background:#fff;padding:16px;max-width:95vw;max-height:90vh;overflow:auto;position:relative;">
+    <img id="modal-img" src="" style="display:block;max-width:100%;height:auto;">
+    <p id="modal-hint" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6e9480;margin-top:10px;text-align:center;line-height:1.6;"></p>
+  </div>
+  <button onclick="closeModal()" style="margin-top:16px;padding:10px 28px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.4);font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;">SCHLIESSEN</button>
+  <a id="modal-dl" download="Überweisungsdaten.png" style="display:none;margin-top:10px;padding:10px 28px;background:#2e7a50;color:#fff;border:none;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;text-decoration:none;">↓ PNG HERUNTERLADEN</a>
 </div>
 
 <footer>© Robin Glowania · Zuletzt aktualisiert: 03.04.2026</footer>
@@ -728,6 +738,8 @@ function generate() {
   vctx.fillRect(0, 0, size, size);
   vctx.drawImage(tmpCanvas, quiet, quiet);
   wrap.appendChild(visCanvas);
+  visCanvas.style.display = 'block';
+  visCanvas.style.margin = '0 auto';
 
   // Info-Text
   var info = document.getElementById('qr-info');
@@ -746,15 +758,13 @@ function generate() {
   document.getElementById('result-card').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
-/* ── Download PNG mit Beschriftung ─────────────────────────── */
-function downloadPNG() {
+/* ── Bild-Erzeugung (gemeinsam für Modal + Download) ─────────── */
+function buildOutputCanvas() {
   var qrCanvas = document.querySelector('#qr-canvas canvas');
-  if (!qrCanvas || !_lastFields) { alert('Bitte zuerst QR-Code generieren.'); return; }
-
+  if (!qrCanvas || !_lastFields) return null;
   var f = _lastFields;
   var qrSize = qrCanvas.width;
 
-  // Zeilen
   var lines = [
     { label: 'Empfänger', value: f.name },
     { label: 'IBAN',      value: ibanFormatted(f.iban) },
@@ -763,7 +773,6 @@ function downloadPNG() {
   if (f.remittance) lines.push({ label: 'Referenz', value: f.remittance });
   if (f.bic)        lines.push({ label: 'BIC',      value: f.bic });
 
-  // Layout (logische Pixel)
   var pad     = 14;
   var sepH    = 12;
   var lineH   = 16;
@@ -772,7 +781,6 @@ function downloadPNG() {
   var footerH = 16;
   var textBlockH = headerH + lines.length * lineH + 8;
 
-  // Breite: max(QR-Größe, längster Text) + Rand
   var measureCanvas = document.createElement('canvas');
   var mctx = measureCanvas.getContext('2d');
   mctx.font = '9px "Courier New", monospace';
@@ -784,7 +792,6 @@ function downloadPNG() {
   var totalW  = Math.max(qrSize, Math.ceil(maxTextW)) + pad * 2;
   var totalH  = pad + qrSize + sepH + 1 + 8 + textBlockH + footerH + pad;
 
-  // HiDPI: 3× für scharfe Ausgabe
   var dpr = 3;
   var out = document.createElement('canvas');
   out.width  = totalW * dpr;
@@ -792,14 +799,13 @@ function downloadPNG() {
   var ctx = out.getContext('2d');
   ctx.scale(dpr, dpr);
 
-  // Weißer Hintergrund
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, totalW, totalH);
 
-  // QR-Code
-  ctx.drawImage(qrCanvas, pad, pad, qrSize, qrSize);
+  // QR zentriert
+  var qrX = Math.round((totalW - qrSize) / 2);
+  ctx.drawImage(qrCanvas, qrX, pad, qrSize, qrSize);
 
-  // Trennlinie
   var lineY = pad + qrSize + sepH;
   ctx.strokeStyle = '#c8ddd2';
   ctx.lineWidth = 0.5;
@@ -808,14 +814,12 @@ function downloadPNG() {
   ctx.lineTo(totalW - pad, lineY);
   ctx.stroke();
 
-  // Überschrift
-  var curY = lineY + 8 + 9; // +9 = font baseline
+  var curY = lineY + 8 + 9;
   ctx.fillStyle = '#2e7a50';
   ctx.font = 'bold 9px "Courier New", monospace';
   ctx.fillText('SEPA ÜBERWEISUNG  ·  GiroCode', pad, curY);
   curY += lineH;
 
-  // Daten-Zeilen
   lines.forEach(function(row) {
     ctx.fillStyle = '#6e9480';
     ctx.font = '8px "Courier New", monospace';
@@ -826,16 +830,41 @@ function downloadPNG() {
     curY += lineH;
   });
 
-  // Footer
   ctx.fillStyle = '#bbbbbb';
   ctx.font = '7px "Courier New", monospace';
   ctx.fillText('GiroCode · Robin Glowania', pad, totalH - 5);
 
-  // Download (Ausgabe in nativer Auflösung = scharf)
-  var link = document.createElement('a');
-  link.download = 'Überweisungsdaten.png';
-  link.href = out.toDataURL('image/png');
-  link.click();
+  return out;
+}
+
+/* ── Bild anzeigen (Modal) ───────────────────────────────────── */
+function showImage() {
+  var out = buildOutputCanvas();
+  if (!out) { alert('Bitte zuerst QR-Code generieren.'); return; }
+  var dataUrl = out.toDataURL('image/png');
+
+  var modal = document.getElementById('img-modal');
+  document.getElementById('modal-img').src = dataUrl;
+
+  // iOS erkennen
+  var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  var hint  = document.getElementById('modal-hint');
+  var dlBtn = document.getElementById('modal-dl');
+
+  if (isIOS) {
+    hint.textContent = 'Bild lange drücken → „Bild sichern" → wird in der Foto-App gespeichert';
+    dlBtn.style.display = 'none';
+  } else {
+    hint.textContent = '';
+    dlBtn.href = dataUrl;
+    dlBtn.style.display = 'inline-block';
+  }
+
+  modal.style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('img-modal').style.display = 'none';
 }
 
 /* ── EPC-String kopieren ────────────────────────────────────── */
