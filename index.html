@@ -453,43 +453,87 @@ function parseLive(el) {
 
 function runParser(text) {
   var found = {};
+  var lines = text.split(/[\r\n]+/).map(function(l){ return l.trim(); }).filter(function(l){ return l.length > 0; });
 
   // ── IBAN ──────────────────────────────────────────────────────
-  var ibanMatch = text.match(/\b([A-Z]{2}\s*\d{2}(?:\s*[A-Z0-9]{4}){1,7}\s*[A-Z0-9]{0,4})\b/i);
+  // Suche in gesamtem Text (mit oder ohne Leerzeichen alle 4 Stellen)
+  var ibanMatch = text.match(/\b([A-Z]{2}\s*\d{2}(?:\s*[A-Z0-9]{4}){1,7}(?:\s*[A-Z0-9]{1,3})?)\b/i);
   if (ibanMatch) {
     var raw = ibanMatch[1].replace(/\s/g,'').toUpperCase();
     if (validateIBAN(raw)) found.iban = raw;
   }
 
   // ── BIC ───────────────────────────────────────────────────────
-  var bicMatch = text.match(/\b(?:BIC|SWIFT)[:\s]*([A-Z]{6}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\b/i)
-    || text.match(/\b([A-Z]{6}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\b/);
+  var bicMatch = text.match(/\b(?:BIC|SWIFT)[:\s]+([A-Z]{6}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\b/i);
   if (bicMatch) found.bic = bicMatch[1].toUpperCase();
 
   // ── Betrag ────────────────────────────────────────────────────
-  // Verschiedene Formate: 1.234,56 EUR / EUR 1234.56 / 49,90 / 1,234.56
+  // Alle gängigen Formate, inkl. "950 €", "€ 950", "950", "1.234,56", "1234.56"
   var amtPatterns = [
-    /(?:EUR|€)\s*([\d]{1,3}(?:\.\d{3})*,\d{2})/i,   // EUR 1.234,56
-    /(?:EUR|€)\s*([\d]+,\d{2})/i,                     // EUR 49,90
-    /([\d]{1,3}(?:\.\d{3})*,\d{2})\s*(?:EUR|€)/i,    // 1.234,56 EUR
-    /([\d]+,\d{2})\s*(?:EUR|€)/i,                     // 49,90 EUR
-    /(?:EUR|€)\s*([\d]{1,3}(?:,\d{3})*\.\d{2})/i,    // EUR 1,234.56
-    /([\d]{1,3}(?:,\d{3})*\.\d{2})\s*(?:EUR|€)/i,    // 1,234.56 EUR
-    /(?:Betrag|Amount|Summe|Total)[:\s]*([\d]{1,3}(?:[.,]\d{3})*[.,]\d{2})/i,
+    /(?:EUR|€)\s*([\d]{1,3}(?:\.\d{3})*,\d{2})/i,     // EUR/€ 1.234,56
+    /([\d]{1,3}(?:\.\d{3})*,\d{2})\s*(?:EUR|€)/i,      // 1.234,56 EUR/€
+    /(?:EUR|€)\s*([\d]+,\d{1,2})/i,                     // EUR/€ 49,90 oder 49,9
+    /([\d]+,\d{1,2})\s*(?:EUR|€)/i,                     // 49,90 EUR/€
+    /(?:EUR|€)\s*([\d]{1,3}(?:,\d{3})*\.\d{2})/i,      // EUR/€ 1,234.56
+    /([\d]{1,3}(?:,\d{3})*\.\d{2})\s*(?:EUR|€)/i,      // 1,234.56 EUR/€
+    /(?:EUR|€)\s*([\d]+\.?\d*)/i,                        // EUR/€ 950 oder EUR/€ 950.00
+    /([\d]+\.?\d*)\s*(?:EUR|€)/i,                        // 950 EUR/€ oder 950 €
+    /(?:Betrag|Amount|Summe|Total)[:\s]*([\d]{1,3}(?:[.,]\d{3})*[.,]\d{1,2})/i,
+    /(?:Betrag|Amount|Summe|Total)[:\s]*([\d]+)/i,
   ];
-  for (var i=0;i<amtPatterns.length;i++) {
+  for (var i = 0; i < amtPatterns.length; i++) {
     var m = text.match(amtPatterns[i]);
     if (m) { found.amount = m[1]; break; }
   }
 
   // ── Name ──────────────────────────────────────────────────────
-  // Suche nach "Empfänger:", "Begünstigter:", "Name:", "An:", "Zahlungsempfänger:"
-  var nameMatch = text.match(/(?:Empfänger|Begünstigte?r?|Zahlungsempfänger|Name|An|Payee|Beneficiary)[:\s]+([^\n\r,]{3,70})/i);
-  if (nameMatch) found.name = nameMatch[1].trim().replace(/\s+/g,' ');
+  // 1. Mit Schlüsselwort
+  var nameMatch = text.match(/(?:Empfänger|Begünstigte?r?|Zahlungsempfänger|Name|An|Payee|Beneficiary)\s*[:\-]\s*([^\n\r,]{2,70})/i);
+  if (nameMatch) {
+    found.name = nameMatch[1].trim().replace(/\s+/g,' ');
+  } else {
+    // 2. Zeilen-Fallback: erste Zeile die keine IBAN, kein Betrag, kein BIC, keine Zahl ist
+    for (var j = 0; j < lines.length; j++) {
+      var l = lines[j];
+      // Überspringen: IBAN-Zeile
+      if (/^[A-Z]{2}\d{2}/i.test(l.replace(/\s/g,''))) continue;
+      // Überspringen: Zeile enthält nur Zahl + optionale Währung
+      if (/^[\d\s.,]+\s*(?:EUR|€|CHF)?$/i.test(l)) continue;
+      // Überspringen: BIC-Muster
+      if (/^[A-Z]{6}[A-Z0-9]{2,5}$/i.test(l)) continue;
+      // Überspringen: sieht aus wie Schlüsselwort-Zeile
+      if (/^(?:Betrag|IBAN|BIC|Verwendungszweck|Referenz|Betreff|Re\.|Re:)/i.test(l)) continue;
+      // Überspringen: zu kurz
+      if (l.length < 2) continue;
+      found.name = l.substring(0, 70);
+      break;
+    }
+  }
 
-  // ── Verwendungszweck ─────────────────────────────────────────
-  var remMatch = text.match(/(?:Verwendungszweck|Betreff|Referenz|Reference|Purpose|Zweck|Re\.|Re:)[:\s]+([^\n\r]{1,140})/i);
-  if (remMatch) found.remittance = remMatch[1].trim();
+  // ── Verwendungszweck / Referenz ───────────────────────────────
+  // 1. Mit Schlüsselwort
+  var remMatch = text.match(/(?:Verwendungszweck|Betreff|Referenz|Reference|Purpose|Zweck|Re\.|Re:)\s*[:\-]?\s*([^\n\r]{1,140})/i);
+  if (remMatch) {
+    found.remittance = remMatch[1].trim();
+  } else {
+    // 2. Zeilen-Fallback: letzte Zeile die nicht Name, IBAN, Betrag oder BIC ist
+    var usedName = found.name || '';
+    var usedIban = found.iban || '';
+    for (var k = lines.length - 1; k >= 0; k--) {
+      var lk = lines[k];
+      if (lk === usedName) continue;
+      if (lk.replace(/\s/g,'').toUpperCase() === usedIban) continue;
+      if (/^[A-Z]{2}\d{2}/i.test(lk.replace(/\s/g,''))) continue;
+      if (/^[\d\s.,]+\s*(?:EUR|€|CHF)?$/i.test(lk)) continue;
+      if (/^[A-Z]{6}[A-Z0-9]{2,5}$/i.test(lk)) continue;
+      if (/^(?:Betrag|IBAN|BIC|Verwendungszweck|Referenz|Betreff)/i.test(lk)) continue;
+      if (lk.length < 2) continue;
+      // Nicht denselben wie Name nehmen
+      if (lk === found.name) continue;
+      found.remittance = lk.substring(0, 140);
+      break;
+    }
+  }
 
   // ── Chips rendern ─────────────────────────────────────────────
   renderChips(found);
