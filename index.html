@@ -242,8 +242,16 @@ textarea{resize:vertical;min-height:60px;}
         placeholder="Einfach Text einfügen, z. B.:&#10;Empfänger: Max Mustermann&#10;IBAN: DE89 3704 0044 0532 0130 00&#10;Betrag: 49,90 EUR&#10;Verwendungszweck: Rechnung 2024-042"
         oninput="parseLive(this)"></textarea>
     </label>
+    <label style="margin-bottom:12px;">
+      <span class="lbl">Anthropic API-Key <span style="font-size:9px;opacity:.6;">(wird nur lokal gespeichert)</span></span>
+      <div style="display:flex;gap:8px;">
+        <input type="password" id="api-key-input" placeholder="sk-ant-…" style="flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;padding:8px 12px;outline:none;">
+        <button onclick="saveApiKey()" style="padding:8px 16px;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;cursor:pointer;white-space:nowrap;">SPEICHERN</button>
+      </div>
+      <p class="hint">Benötigt für Dokumenten-Analyse · <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--accent);">Key erstellen</a></p>
+    </label>
     <label style="margin-bottom:0;">
-      <span class="lbl">Oder Dokument hochladen (PDF, Foto)</span>
+      <span class="lbl">Dokument hochladen (PDF, Foto)</span>
       <div id="upload-zone"
            style="border:1px dashed var(--border);background:var(--surface2);padding:18px;text-align:center;cursor:pointer;transition:border-color .2s;"
            onclick="document.getElementById('file-input').click()"
@@ -257,6 +265,10 @@ textarea{resize:vertical;min-height:60px;}
       </div>
       <input type="file" id="file-input" accept=".pdf,image/*" style="display:none;" onchange="handleFileUpload(this.files[0])">
     </label>
+    <!-- Bild-Vorschau nach Upload -->
+    <div id="upload-preview" style="display:none;margin-top:10px;text-align:center;">
+      <img id="preview-img" src="" style="max-width:100%;max-height:200px;border:1px solid var(--border);">
+    </div>
     <div id="parse-result" style="display:none;margin-top:12px;">
       <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;color:var(--text-muted);margin-bottom:8px;">ERKANNTE FELDER</div>
       <div id="parse-chips" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
@@ -456,8 +468,23 @@ function setTheme(t) {
 })();
 
 /* ══════════════════════════════════════════════════════════════
-   DATEI-UPLOAD & KI-EXTRAKTION
+   DATEI-UPLOAD & KI-EXTRAKTION (Claude API)
    ══════════════════════════════════════════════════════════════ */
+
+function saveApiKey() {
+  var key = document.getElementById('api-key-input').value.trim();
+  if (!key) return;
+  try { localStorage.setItem('girocode-api-key', key); } catch(e){}
+  var btn = event.target;
+  btn.textContent = '✓ OK';
+  setTimeout(function(){ btn.textContent = 'SPEICHERN'; }, 1500);
+}
+
+function getApiKey() {
+  var fromInput = document.getElementById('api-key-input').value.trim();
+  if (fromInput) return fromInput;
+  try { return localStorage.getItem('girocode-api-key') || ''; } catch(e){ return ''; }
+}
 
 function handleDrop(e) {
   e.preventDefault();
@@ -479,6 +506,21 @@ async function handleFileUpload(file) {
   var isImg = file.type.startsWith('image/');
   if (!isPDF && !isImg) { setUploadStatus('Nur PDF oder Bilddateien erlaubt.', true); return; }
 
+  // Bildvorschau
+  if (isImg) {
+    var previewUrl = URL.createObjectURL(file);
+    document.getElementById('preview-img').src = previewUrl;
+    document.getElementById('upload-preview').style.display = 'block';
+  } else {
+    document.getElementById('upload-preview').style.display = 'none';
+  }
+
+  var apiKey = getApiKey();
+  if (!apiKey) {
+    setUploadStatus('Bitte zuerst API-Key eingeben und speichern.', true);
+    return;
+  }
+
   setUploadStatus('Wird analysiert …');
 
   try {
@@ -489,15 +531,18 @@ async function handleFileUpload(file) {
       r.readAsDataURL(file);
     });
 
-    var mediaType = file.type;
-
     var contentBlock = isPDF
       ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } }
-      : { type: 'image',    source: { type: 'base64', media_type: mediaType,           data: base64 } };
+      : { type: 'image',    source: { type: 'base64', media_type: file.type,          data: base64 } };
 
     var resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1000,
@@ -512,12 +557,18 @@ async function handleFileUpload(file) {
       })
     });
 
+    if (!resp.ok) {
+      var errData = await resp.json().catch(function(){ return {}; });
+      var errMsg = (errData.error && errData.error.message) ? errData.error.message : 'HTTP ' + resp.status;
+      setUploadStatus('API-Fehler: ' + errMsg, true);
+      return;
+    }
+
     var data = await resp.json();
     var rawText = (data.content || []).map(function(b){ return b.text || ''; }).join('');
     var clean = rawText.replace(/```json|```/g,'').trim();
     var parsed = JSON.parse(clean);
 
-    // Ins Freitextfeld übernehmen + Parser laufen lassen
     var lines = [];
     if (parsed.name)       lines.push(parsed.name);
     if (parsed.iban)       lines.push(parsed.iban);
@@ -536,9 +587,10 @@ async function handleFileUpload(file) {
 
   } catch(err) {
     console.error(err);
-    setUploadStatus('Fehler bei der Analyse. Bitte manuell eingeben.', true);
+    setUploadStatus('Fehler: ' + err.message, true);
   }
 }
+
 
 /* ══════════════════════════════════════════════════════════════
    FREITEXT-PARSER
@@ -787,6 +839,11 @@ document.addEventListener('DOMContentLoaded', function(){
     this.dataset.userEdited = '1';
   });
   document.getElementById('iban-display').style.display = 'block';
+  // API-Key laden
+  try {
+    var savedKey = localStorage.getItem('girocode-api-key');
+    if (savedKey) document.getElementById('api-key-input').value = savedKey;
+  } catch(e){}
 });
 
 /* ── EPC-String aufbauen ────────────────────────────────────── */
