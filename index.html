@@ -242,6 +242,21 @@ textarea{resize:vertical;min-height:60px;}
         placeholder="Einfach Text einfügen, z. B.:&#10;Empfänger: Max Mustermann&#10;IBAN: DE89 3704 0044 0532 0130 00&#10;Betrag: 49,90 EUR&#10;Verwendungszweck: Rechnung 2024-042"
         oninput="parseLive(this)"></textarea>
     </label>
+    <label style="margin-bottom:0;">
+      <span class="lbl">Oder Dokument hochladen (PDF, Foto)</span>
+      <div id="upload-zone"
+           style="border:1px dashed var(--border);background:var(--surface2);padding:18px;text-align:center;cursor:pointer;transition:border-color .2s;"
+           onclick="document.getElementById('file-input').click()"
+           ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
+           ondragleave="this.style.borderColor='var(--border)'"
+           ondrop="handleDrop(event)">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-muted);">
+          PDF oder Bild hier ablegen · oder klicken zum Auswählen
+        </div>
+        <div id="upload-status" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--accent);margin-top:6px;display:none;"></div>
+      </div>
+      <input type="file" id="file-input" accept=".pdf,image/*" style="display:none;" onchange="handleFileUpload(this.files[0])">
+    </label>
     <div id="parse-result" style="display:none;margin-top:12px;">
       <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;color:var(--text-muted);margin-bottom:8px;">ERKANNTE FELDER</div>
       <div id="parse-chips" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
@@ -439,6 +454,91 @@ function setTheme(t) {
   try { saved = localStorage.getItem('g-theme') || 'system'; } catch(e){}
   setTheme(saved);
 })();
+
+/* ══════════════════════════════════════════════════════════════
+   DATEI-UPLOAD & KI-EXTRAKTION
+   ══════════════════════════════════════════════════════════════ */
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('upload-zone').style.borderColor = 'var(--border)';
+  var file = e.dataTransfer.files[0];
+  if (file) handleFileUpload(file);
+}
+
+function setUploadStatus(msg, isErr) {
+  var el = document.getElementById('upload-status');
+  el.textContent = msg;
+  el.style.color = isErr ? '#e05c5c' : 'var(--accent)';
+  el.style.display = msg ? 'block' : 'none';
+}
+
+async function handleFileUpload(file) {
+  if (!file) return;
+  var isPDF = file.type === 'application/pdf';
+  var isImg = file.type.startsWith('image/');
+  if (!isPDF && !isImg) { setUploadStatus('Nur PDF oder Bilddateien erlaubt.', true); return; }
+
+  setUploadStatus('Wird analysiert …');
+
+  try {
+    var base64 = await new Promise(function(res, rej) {
+      var r = new FileReader();
+      r.onload = function() { res(r.result.split(',')[1]); };
+      r.onerror = rej;
+      r.readAsDataURL(file);
+    });
+
+    var mediaType = file.type;
+
+    var contentBlock = isPDF
+      ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } }
+      : { type: 'image',    source: { type: 'base64', media_type: mediaType,           data: base64 } };
+
+    var resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: 'Du extrahierst Zahlungsdaten aus Dokumenten. Antworte NUR mit einem JSON-Objekt, kein Text davor oder danach, keine Markdown-Backticks. Format: {"name":"...","iban":"...","bic":"...","amount":"...","remittance":"..."}. Felder die nicht gefunden werden als leeren String "". IBAN immer ohne Leerzeichen. Betrag als deutsche Zahl z.B. "49,90" ohne Währungssymbol.',
+        messages: [{
+          role: 'user',
+          content: [
+            contentBlock,
+            { type: 'text', text: 'Extrahiere alle Zahlungsdaten aus diesem Dokument: Empfängername, IBAN, BIC, Betrag, Verwendungszweck/Referenz.' }
+          ]
+        }]
+      })
+    });
+
+    var data = await resp.json();
+    var rawText = (data.content || []).map(function(b){ return b.text || ''; }).join('');
+    var clean = rawText.replace(/```json|```/g,'').trim();
+    var parsed = JSON.parse(clean);
+
+    // Ins Freitextfeld übernehmen + Parser laufen lassen
+    var lines = [];
+    if (parsed.name)       lines.push(parsed.name);
+    if (parsed.iban)       lines.push(parsed.iban);
+    if (parsed.amount)     lines.push(parsed.amount + ' EUR');
+    if (parsed.remittance) lines.push(parsed.remittance);
+    if (parsed.bic)        lines.push('BIC: ' + parsed.bic);
+
+    if (lines.length === 0) {
+      setUploadStatus('Keine Zahlungsdaten gefunden.', true);
+      return;
+    }
+
+    document.getElementById('parse-input').value = lines.join('\n');
+    runParser(lines.join('\n'));
+    setUploadStatus('✓ ' + lines.length + ' Felder erkannt');
+
+  } catch(err) {
+    console.error(err);
+    setUploadStatus('Fehler bei der Analyse. Bitte manuell eingeben.', true);
+  }
+}
 
 /* ══════════════════════════════════════════════════════════════
    FREITEXT-PARSER
