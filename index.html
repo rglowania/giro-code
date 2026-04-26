@@ -242,14 +242,6 @@ textarea{resize:vertical;min-height:60px;}
         placeholder="Einfach Text einfügen, z. B.:&#10;Empfänger: Max Mustermann&#10;IBAN: DE89 3704 0044 0532 0130 00&#10;Betrag: 49,90 EUR&#10;Verwendungszweck: Rechnung 2024-042"
         oninput="parseLive(this)"></textarea>
     </label>
-    <label style="margin-bottom:12px;">
-      <span class="lbl">Anthropic API-Key <span style="font-size:9px;opacity:.6;">(wird nur lokal gespeichert)</span></span>
-      <div style="display:flex;gap:8px;">
-        <input type="password" id="api-key-input" placeholder="sk-ant-…" style="flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;padding:8px 12px;outline:none;">
-        <button onclick="saveApiKey()" style="padding:8px 16px;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;cursor:pointer;white-space:nowrap;">SPEICHERN</button>
-      </div>
-      <p class="hint">Benötigt für Dokumenten-Analyse · <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--accent);">Key erstellen</a></p>
-    </label>
     <label style="margin-bottom:0;">
       <span class="lbl">Dokument hochladen (PDF, Foto)</span>
       <div id="upload-zone"
@@ -265,7 +257,6 @@ textarea{resize:vertical;min-height:60px;}
       </div>
       <input type="file" id="file-input" accept=".pdf,image/*" style="display:none;" onchange="handleFileUpload(this.files[0])">
     </label>
-    <!-- Bild-Vorschau nach Upload -->
     <div id="upload-preview" style="display:none;margin-top:10px;text-align:center;">
       <img id="preview-img" src="" style="max-width:100%;max-height:200px;border:1px solid var(--border);">
     </div>
@@ -447,7 +438,7 @@ textarea{resize:vertical;min-height:60px;}
   <a id="modal-dl" download="Überweisungsdaten.png" style="display:none;margin-top:10px;padding:10px 28px;background:#2e7a50;color:#fff;border:none;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;text-decoration:none;">↓ PNG HERUNTERLADEN</a>
 </div>
 
-<footer>© Robin Glowania · Zuletzt aktualisiert: 12.04.2026</footer>
+<footer>© Robin Glowania · Zuletzt aktualisiert: 26.04.2026</footer>
 
 <script>
 function setTheme(t) {
@@ -468,23 +459,8 @@ function setTheme(t) {
 })();
 
 /* ══════════════════════════════════════════════════════════════
-   DATEI-UPLOAD & KI-EXTRAKTION (Claude API)
+   DATEI-UPLOAD & OCR (Tesseract.js, läuft lokal im Browser)
    ══════════════════════════════════════════════════════════════ */
-
-function saveApiKey() {
-  var key = document.getElementById('api-key-input').value.trim();
-  if (!key) return;
-  try { localStorage.setItem('girocode-api-key', key); } catch(e){}
-  var btn = event.target;
-  btn.textContent = '✓ OK';
-  setTimeout(function(){ btn.textContent = 'SPEICHERN'; }, 1500);
-}
-
-function getApiKey() {
-  var fromInput = document.getElementById('api-key-input').value.trim();
-  if (fromInput) return fromInput;
-  try { return localStorage.getItem('girocode-api-key') || ''; } catch(e){ return ''; }
-}
 
 function handleDrop(e) {
   e.preventDefault();
@@ -500,9 +476,19 @@ function setUploadStatus(msg, isErr) {
   el.style.display = msg ? 'block' : 'none';
 }
 
+function loadScript(src) {
+  return new Promise(function(res, rej) {
+    var s = document.createElement('script');
+    s.src = src;
+    s.onload = res;
+    s.onerror = function(){ rej(new Error('Konnte ' + src + ' nicht laden')); };
+    document.head.appendChild(s);
+  });
+}
+
 async function handleFileUpload(file) {
   if (!file) return;
-  var isPDF = file.type === 'application/pdf';
+  var isPDF = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
   var isImg = file.type.startsWith('image/');
   if (!isPDF && !isImg) { setUploadStatus('Nur PDF oder Bilddateien erlaubt.', true); return; }
 
@@ -515,79 +501,73 @@ async function handleFileUpload(file) {
     document.getElementById('upload-preview').style.display = 'none';
   }
 
-  var apiKey = getApiKey();
-  if (!apiKey) {
-    setUploadStatus('Bitte zuerst API-Key eingeben und speichern.', true);
-    return;
-  }
-
-  setUploadStatus('Wird analysiert …');
+  setUploadStatus('Wird vorbereitet …');
 
   try {
-    var base64 = await new Promise(function(res, rej) {
-      var r = new FileReader();
-      r.onload = function() { res(r.result.split(',')[1]); };
-      r.onerror = rej;
-      r.readAsDataURL(file);
+    var imageInput;
+
+    if (isPDF) {
+      // PDF.js laden falls noch nicht vorhanden
+      if (typeof pdfjsLib === 'undefined') {
+        setUploadStatus('PDF-Engine wird geladen …');
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+      setUploadStatus('PDF wird gerendert …');
+      var arrayBuf = await file.arrayBuffer();
+      var pdfDoc = await pdfjsLib.getDocument({ data: arrayBuf }).promise;
+      var page = await pdfDoc.getPage(1);
+      var viewport = page.getViewport({ scale: 2.0 });
+      var pdfCanvas = document.createElement('canvas');
+      pdfCanvas.width = viewport.width;
+      pdfCanvas.height = viewport.height;
+      await page.render({ canvasContext: pdfCanvas.getContext('2d'), viewport: viewport }).promise;
+      imageInput = pdfCanvas.toDataURL('image/png');
+    } else {
+      imageInput = await new Promise(function(res, rej) {
+        var r = new FileReader();
+        r.onload = function() { res(r.result); };
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
+    }
+
+    // Tesseract.js laden
+    if (typeof Tesseract === 'undefined') {
+      setUploadStatus('OCR-Engine wird geladen … (einmalig ~10 MB)');
+      await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js');
+    }
+
+    setUploadStatus('OCR läuft …');
+
+    var result = await Tesseract.recognize(imageInput, 'deu+eng', {
+      logger: function(m) {
+        if (m.status === 'recognizing text') {
+          setUploadStatus('OCR: ' + Math.round(m.progress * 100) + ' %');
+        } else if (m.status === 'loading language traineddata') {
+          setUploadStatus('Sprachpaket wird geladen …');
+        }
+      }
     });
 
-    var contentBlock = isPDF
-      ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } }
-      : { type: 'image',    source: { type: 'base64', media_type: file.type,          data: base64 } };
-
-    var resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        system: 'Du extrahierst Zahlungsdaten aus Dokumenten. Antworte NUR mit einem JSON-Objekt, kein Text davor oder danach, keine Markdown-Backticks. Format: {"name":"...","iban":"...","bic":"...","amount":"...","remittance":"..."}. Felder die nicht gefunden werden als leeren String "". IBAN immer ohne Leerzeichen. Betrag als deutsche Zahl z.B. "49,90" ohne Währungssymbol.',
-        messages: [{
-          role: 'user',
-          content: [
-            contentBlock,
-            { type: 'text', text: 'Extrahiere alle Zahlungsdaten aus diesem Dokument: Empfängername, IBAN, BIC, Betrag, Verwendungszweck/Referenz.' }
-          ]
-        }]
-      })
-    });
-
-    if (!resp.ok) {
-      var errData = await resp.json().catch(function(){ return {}; });
-      var errMsg = (errData.error && errData.error.message) ? errData.error.message : 'HTTP ' + resp.status;
-      setUploadStatus('API-Fehler: ' + errMsg, true);
+    var text = (result && result.data && result.data.text) || '';
+    if (!text || text.trim().length < 3) {
+      setUploadStatus('Kein Text erkannt. Bild ggf. zu klein/unscharf.', true);
       return;
     }
 
-    var data = await resp.json();
-    var rawText = (data.content || []).map(function(b){ return b.text || ''; }).join('');
-    var clean = rawText.replace(/```json|```/g,'').trim();
-    var parsed = JSON.parse(clean);
+    // Text ins Freitextfeld + Parser
+    document.getElementById('parse-input').value = text;
+    runParser(text);
 
-    var lines = [];
-    if (parsed.name)       lines.push(parsed.name);
-    if (parsed.iban)       lines.push(parsed.iban);
-    if (parsed.amount)     lines.push(parsed.amount + ' EUR');
-    if (parsed.remittance) lines.push(parsed.remittance);
-    if (parsed.bic)        lines.push('BIC: ' + parsed.bic);
-
-    if (lines.length === 0) {
-      setUploadStatus('Keine Zahlungsdaten gefunden.', true);
-      return;
-    }
-
-    document.getElementById('parse-input').value = lines.join('\n');
-    runParser(lines.join('\n'));
-    setUploadStatus('✓ ' + lines.length + ' Felder erkannt');
+    var chipCount = document.querySelectorAll('#parse-chips > div').length;
+    setUploadStatus(chipCount > 0
+      ? '✓ ' + chipCount + ' Felder erkannt'
+      : 'Text gelesen, aber keine Zahlungsdaten erkannt — bitte manuell prüfen.');
 
   } catch(err) {
     console.error(err);
-    setUploadStatus('Fehler: ' + err.message, true);
+    setUploadStatus('Fehler: ' + (err.message || err), true);
   }
 }
 
@@ -839,11 +819,6 @@ document.addEventListener('DOMContentLoaded', function(){
     this.dataset.userEdited = '1';
   });
   document.getElementById('iban-display').style.display = 'block';
-  // API-Key laden
-  try {
-    var savedKey = localStorage.getItem('girocode-api-key');
-    if (savedKey) document.getElementById('api-key-input').value = savedKey;
-  } catch(e){}
 });
 
 /* ── EPC-String aufbauen ────────────────────────────────────── */
