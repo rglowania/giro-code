@@ -245,24 +245,23 @@ textarea{resize:vertical;min-height:60px;}
         placeholder="Einfach Text einfügen, z. B.:&#10;Empfänger: Max Mustermann&#10;IBAN: DE89 3704 0044 0532 0130 00&#10;Betrag: 49,90 EUR&#10;Verwendungszweck: Rechnung 2024-042"
         oninput="parseLive(this)"></textarea>
     </label>
-    <label style="margin-bottom:0;">
-      <span class="lbl">Dokument hochladen (PDF, Foto)</span>
+    <div style="margin-bottom:0;">
+      <span class="lbl" style="display:block;margin-bottom:6px;">Dokument hochladen (PDF, Foto)</span>
       <div id="upload-zone"
            style="border:1px dashed var(--border);background:var(--surface2);padding:18px;text-align:center;cursor:pointer;transition:border-color .2s;"
-           onclick="document.getElementById('file-input').click()"
            ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
            ondragleave="this.style.borderColor='var(--border)'"
            ondrop="handleDrop(event)">
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-muted);">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-muted);pointer-events:none;">
           PDF oder Bild hier ablegen · oder klicken zum Auswählen
         </div>
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text-muted);margin-top:4px;opacity:.7;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text-muted);margin-top:4px;opacity:.7;pointer-events:none;">
           Erkennt GiroCodes (QR) sowie Text in Rechnungen/Belegen
         </div>
-        <div id="upload-status" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--accent);margin-top:6px;display:none;"></div>
+        <div id="upload-status" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--accent);margin-top:6px;display:none;pointer-events:none;"></div>
       </div>
-      <input type="file" id="file-input" accept=".pdf,image/*" style="display:none;" onchange="handleFileUpload(this.files[0])">
-    </label>
+      <input type="file" id="file-input" accept="image/*,application/pdf" style="position:absolute;left:-9999px;opacity:0;" onchange="handleFileUpload(this.files[0])">
+    </div>
     <div id="upload-preview" style="display:none;margin-top:10px;text-align:center;">
       <img id="preview-img" src="" style="max-width:100%;max-height:200px;border:1px solid var(--border);">
     </div>
@@ -888,6 +887,17 @@ document.addEventListener('DOMContentLoaded', function(){
     this.dataset.userEdited = '1';
   });
   document.getElementById('iban-display').style.display = 'block';
+
+  // Upload-Zone Click-Handler (ohne Inline-onclick wegen iOS Safari)
+  var zone = document.getElementById('upload-zone');
+  var fileInput = document.getElementById('file-input');
+  if (zone && fileInput) {
+    zone.addEventListener('click', function(e){
+      e.preventDefault();
+      fileInput.value = ''; // Reset, damit gleiche Datei nochmal funktioniert
+      fileInput.click();
+    });
+  }
 });
 
 /* ── EPC-String aufbauen ────────────────────────────────────── */
