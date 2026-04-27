@@ -301,113 +301,33 @@ textarea{resize:vertical;min-height:60px;}
 
   <!-- BETRAG & VERWENDUNG -->
   <div class="card">
-    <div class="card-title">Betrag & Verwendungszweck</div>
-    <div class="grid2">
-      <label>
-        <span class="lbl">Betrag (EUR) *</span>
-        <input type="text" id="amount" placeholder="0,00"
-               oninput="fmtAmountInput(this)"
-               onblur="fmtAmountBlur(this)"
-               onfocus="fmtAmountFocus(this)">
-        <p class="hint">0,01 – 999.999.999,99 EUR</p>
-      </label>
-      <label>
-        <span class="lbl">Zweck-Code (optional)</span>
-        <select id="purpose">
-          <option value="">— kein —</option>
-          <option value="BKDF">BKDF – Buchführungsgebühr</option>
-          <option value="BKFE">BKFE – Bankgebühr</option>
-          <option value="BKFM">BKFM – Fondsverwaltungsgebühr</option>
-          <option value="BKIP">BKIP – Verzinsung</option>
-          <option value="BKPP">BKPP – Wertpapier</option>
-          <option value="CBLK">CBLK – Sammelüberweisung</option>
-          <option value="CDCQ">CDCQ – Dividend</option>
-          <option value="CFEE">CFEE – Abwicklungsgebühr</option>
-          <option value="CHAR">CHAR – Spende/Wohltätig</option>
-          <option value="CMDT">CMDT – Warenhandel</option>
-          <option value="CORT">CORT – Handelsabwicklung</option>
-          <option value="DIVI">DIVI – Dividende</option>
-          <option value="EPAY">EPAY – E-Payment</option>
-          <option value="FCOL">FCOL – Forderungsinkasso</option>
-          <option value="GDDS">GDDS – Warenkauf</option>
-          <option value="GDSV">GDSV – Waren & Dienstl.</option>
-          <option value="GOVI">GOVI – Regierungszahlung</option>
-          <option value="GPAY">GPAY – Behördenzahlung</option>
-          <option value="HEDG">HEDG – Hedging</option>
-          <option value="ICCP">ICCP – Akkreditiv</option>
-          <option value="IDCP">IDCP – Dokumenteninkasso</option>
-          <option value="IHRP">IHRP – Zinssicherung</option>
-          <option value="INSU">INSU – Versicherungsprämie</option>
-          <option value="INTC">INTC – Konzernzahlung</option>
-          <option value="INTE">INTE – Zinsen</option>
-          <option value="LEFE">LEFE – Kreditgebühr</option>
-          <option value="LOAR">LOAR – Kreditrückzahlung</option>
-          <option value="MGSC">MGSC – Hypothek</option>
-          <option value="NITL">NITL – Nettolohn</option>
-          <option value="NOWS">NOWS – Nicht spezifiziert</option>
-          <option value="OFEE">OFEE – Eröffnungsgebühr</option>
-          <option value="OTHR">OTHR – Sonstige</option>
-          <option value="PADD">PADD – Vorauszahlung</option>
-          <option value="PDNS">PDNS – Zahlung vor Lieferung</option>
-          <option value="PENS">PENS – Rente/Pension</option>
-          <option value="PEYE">PEYE – Lohnzahlung</option>
-          <option value="POPE">POPE – Eigentumsübertragung</option>
-          <option value="ROYA">ROYA – Lizenzgebühr</option>
-          <option value="SALA">SALA – Gehalt</option>
-          <option value="SECU">SECU – Wertpapiere</option>
-          <option value="SSBE">SSBE – Sozialleistung</option>
-          <option value="STDY">STDY – Stipendium</option>
-          <option value="SUBS">SUBS – Abo-Zahlung</option>
-          <option value="SUPP">SUPP – Lieferantenrechnung</option>
-          <option value="TAXS">TAXS – Steuerzahlung</option>
-          <option value="TRAD">TRAD – Handel</option>
-          <option value="TREA">TREA – Treasury</option>
-          <option value="VATX">VATX – MwSt</option>
-          <option value="VIEW">VIEW – Inkasso</option>
-        </select>
-      </label>
-    </div>
+    <div class="card-title">Details</div>
     <label>
-      <span class="lbl">Verwendungszweck (Remittance)</span>
-      <input type="text" id="remittance" maxlength="140" placeholder="Rechnungsnummer, Betreff …">
-      <p class="hint">Max. 140 Zeichen · Entweder Freitext oder strukturierter Referenz (ISO 11649)</p>
+      <span class="lbl">Betrag (EUR) *</span>
+      <input type="text" id="amount" placeholder="0,00"
+             oninput="fmtAmountInput(this)"
+             onblur="fmtAmountBlur(this)"
+             onfocus="fmtAmountFocus(this)">
+      <p class="hint">0,01 – 999.999.999,99 EUR</p>
     </label>
     <label>
-      <span class="lbl">Typ der Referenz</span>
-      <select id="remtype">
-        <option value="unstructured">Unstrukturiert (Freitext)</option>
-        <option value="structured">Strukturiert (ISO 11649 Creditor Reference)</option>
-      </select>
+      <span class="lbl">Verwendungszweck/Referenz</span>
+      <input type="text" id="remittance" maxlength="140" placeholder="Rechnungsnummer, Betreff …">
+      <p class="hint">Max. 140 Zeichen</p>
     </label>
   </div>
 
   <!-- OPTIONEN -->
   <div class="card">
     <div class="card-title">Optionen</div>
-    <div class="grid2">
-      <label>
-        <span class="lbl">QR-Größe (px)</span>
-        <select id="qrsize">
-          <option value="160" selected>Klein (160 px)</option>
-          <option value="200">Mittel (200 px)</option>
-          <option value="256">Groß (256 px)</option>
-          <option value="320">Sehr groß (320 px)</option>
-        </select>
-      </label>
-      <label>
-        <span class="lbl">Fehlerkorrektur</span>
-        <select id="ecl">
-          <option value="M" selected>M – mittel (empfohlen)</option>
-          <option value="L">L – niedrig</option>
-          <option value="Q">Q – hoch</option>
-          <option value="H">H – sehr hoch</option>
-        </select>
-      </label>
-    </div>
     <label>
-      <span class="lbl">Information für Zahlenden (optional)</span>
-      <input type="text" id="info" maxlength="70" placeholder="Interne Notiz, nicht Teil des QR-Codes">
-      <p class="hint">Wird <b>nicht</b> im QR-Code gespeichert · nur zur Anzeige unter dem Code</p>
+      <span class="lbl">QR-Größe (px)</span>
+      <select id="qrsize">
+        <option value="160" selected>Klein (160 px)</option>
+        <option value="200">Mittel (200 px)</option>
+        <option value="256">Groß (256 px)</option>
+        <option value="320">Sehr groß (320 px)</option>
+      </select>
     </label>
   </div>
 
@@ -443,7 +363,7 @@ textarea{resize:vertical;min-height:60px;}
   <a id="modal-dl" download="Überweisungsdaten.png" style="display:none;margin-top:10px;padding:10px 28px;background:#2e7a50;color:#fff;border:none;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;text-decoration:none;">↓ PNG HERUNTERLADEN</a>
 </div>
 
-<footer>© Robin Glowania · Zuletzt aktualisiert: 26.04.2026</footer>
+<footer>© Robin Glowania · Zuletzt aktualisiert: 27.04.2026</footer>
 
 <script>
 function setTheme(t) {
@@ -539,19 +459,32 @@ async function pdfToImageData(file) {
 function parseEPCString(text) {
   if (!text || text.indexOf('BCD') !== 0) return null;
   var lines = text.split(/\r?\n/);
-  // EPC069-12 Felder: 0=BCD, 1=Version, 2=Charset, 3=SCT, 4=BIC, 5=Name, 6=IBAN, 7=Amount, 8=Purpose, 9=StructRef, 10=UnstructRef, 11=Info
   if (lines[3] !== 'SCT') return null;
   var amt = lines[7] || '';
   var amtNum = '';
   if (amt.indexOf('EUR') === 0) {
-    amtNum = parseFloat(amt.substring(3)).toFixed(2).replace('.', ',');
+    var n = parseFloat(amt.substring(3));
+    if (!isNaN(n)) amtNum = n.toFixed(2).replace('.', ',');
+  }
+  // Referenz: zuerst structured (9), dann unstructured (10), dann letzte nicht-leere Zeile als Fallback
+  var ref = '';
+  if (lines[9] && lines[9].trim())  ref = lines[9].trim();
+  if (lines[10] && lines[10].trim()) ref = lines[10].trim(); // unstructured hat Vorrang
+  // Falls beides leer aber es noch weitere Zeilen gibt (Information field etc.)
+  if (!ref) {
+    for (var i = lines.length - 1; i >= 8; i--) {
+      if (lines[i] && lines[i].trim() && lines[i] !== amt) {
+        ref = lines[i].trim();
+        break;
+      }
+    }
   }
   return {
-    bic:        lines[4] || '',
-    name:       lines[5] || '',
-    iban:       lines[6] || '',
+    bic:        (lines[4] || '').trim(),
+    name:       (lines[5] || '').trim(),
+    iban:       (lines[6] || '').trim(),
     amount:     amtNum,
-    remittance: lines[10] || lines[9] || ''
+    remittance: ref
   };
 }
 
@@ -581,17 +514,41 @@ async function handleFileUpload(file) {
         inversionAttempts: 'attemptBoth'
       });
       if (qr && qr.data) {
+        console.log('QR-Code dekodiert:', JSON.stringify(qr.data));
         var epc = parseEPCString(qr.data);
+        console.log('EPC-Parser-Ergebnis:', epc);
         if (epc) {
-          var lines = [];
-          if (epc.name)       lines.push(epc.name);
-          if (epc.iban)       lines.push(epc.iban);
-          if (epc.amount)     lines.push(epc.amount + ' EUR');
-          if (epc.remittance) lines.push(epc.remittance);
-          if (epc.bic)        lines.push('BIC: ' + epc.bic);
-          document.getElementById('parse-input').value = lines.join('\n');
-          runParser(lines.join('\n'));
-          setUploadStatus('✓ GiroCode erkannt — ' + lines.length + ' Felder übernommen');
+          // Direkt in die Formular-Felder schreiben (Daten sind schon strukturiert)
+          if (epc.name) document.getElementById('name').value = epc.name.substring(0,70);
+          if (epc.iban) {
+            document.getElementById('iban').value = epc.iban;
+            document.getElementById('iban-display').textContent = ibanFormatted(epc.iban);
+            lookupBIC(epc.iban);
+          }
+          if (epc.bic) {
+            document.getElementById('bic').value = epc.bic;
+          }
+          if (epc.amount) {
+            document.getElementById('amount').value = epc.amount;
+            _rawAmount = epc.amount;
+            fmtAmountBlur(document.getElementById('amount'));
+          }
+          if (epc.remittance) document.getElementById('remittance').value = epc.remittance.substring(0,140);
+
+          // Freitextfeld zur Info befüllen + Chips anzeigen
+          var infoLines = [];
+          if (epc.name)       infoLines.push(epc.name);
+          if (epc.iban)       infoLines.push(epc.iban);
+          if (epc.amount)     infoLines.push(epc.amount + ' EUR');
+          if (epc.remittance) infoLines.push(epc.remittance);
+          if (epc.bic)        infoLines.push('BIC: ' + epc.bic);
+          document.getElementById('parse-input').value = infoLines.join('\n');
+          renderChips({
+            name: epc.name, iban: epc.iban, amount: epc.amount,
+            remittance: epc.remittance, bic: epc.bic
+          });
+
+          setUploadStatus('✓ GiroCode erkannt — ' + infoLines.length + ' Felder übernommen');
           return;
         } else {
           // Anderer QR-Code, einfach Text in Freitext
@@ -719,16 +676,20 @@ function runParser(text) {
     // 2. Zeilen-Fallback: letzte Zeile die nicht Name, IBAN, Betrag oder BIC ist
     var usedName = found.name || '';
     var usedIban = found.iban || '';
+    var usedAmount = found.amount || '';
     for (var k = lines.length - 1; k >= 0; k--) {
       var lk = lines[k];
       if (lk === usedName) continue;
       if (lk.replace(/\s/g,'').toUpperCase() === usedIban) continue;
       if (/^[A-Z]{2}\d{2}/i.test(lk.replace(/\s/g,''))) continue;
-      if (/^[\d\s.,]+\s*(?:EUR|€|CHF)?$/i.test(lk)) continue;
+      // Betrag-ähnliche Zeile: nur ausschließen wenn Komma+2 Stellen ODER Währungssymbol
+      if (/^\s*\d+[.,]\d{1,2}\s*(?:EUR|€|CHF)?\s*$/i.test(lk)) continue;
+      if (/^\s*[\d\s.,]+\s*(?:EUR|€|CHF)\s*$/i.test(lk)) continue;
+      // Wenn Zeile genau dem gefundenen Betrag-Match entspricht, überspringen
+      if (usedAmount && lk.indexOf(usedAmount) !== -1 && /(?:EUR|€)/i.test(lk)) continue;
       if (/^[A-Z]{6}[A-Z0-9]{2,5}$/i.test(lk)) continue;
       if (/^(?:Betrag|IBAN|BIC|Verwendungszweck|Referenz|Betreff)/i.test(lk)) continue;
-      if (lk.length < 2) continue;
-      // Nicht denselben wie Name nehmen
+      if (lk.length < 1) continue;
       if (lk === found.name) continue;
       found.remittance = lk.substring(0, 140);
       break;
@@ -912,10 +873,10 @@ function buildEPC(fields) {
     fields.name,             // Beneficiary name
     fields.iban,             // IBAN
     amtFormatted,            // Amount
-    fields.purpose,          // Purpose code
-    fields.remtype === 'structured' ? fields.remittance : '',  // Structured ref
-    fields.remtype === 'unstructured' ? fields.remittance : '', // Unstructured
-    ''                       // Information (not used in QR data per spec)
+    '',                      // Purpose code (leer)
+    '',                      // Structured remittance (leer)
+    fields.remittance,       // Unstructured remittance
+    ''                       // Information (nicht im QR)
   ];
   // trailing empty lines entfernen
   while (lines.length > 0 && lines[lines.length-1] === '') lines.pop();
@@ -953,10 +914,7 @@ function generate() {
     iban:      ibanRaw(document.getElementById('iban').value),
     bic:       document.getElementById('bic').value.trim().toUpperCase(),
     amount:    parseAmount(document.getElementById('amount').value),
-    purpose:   document.getElementById('purpose').value,
-    remittance:document.getElementById('remittance').value.trim(),
-    remtype:   document.getElementById('remtype').value,
-    info:      document.getElementById('info').value.trim()
+    remittance:document.getElementById('remittance').value.trim()
   };
 
   var err = validate(fields);
@@ -967,7 +925,7 @@ function generate() {
   _lastEPC = epc;
 
   var size = parseInt(document.getElementById('qrsize').value);
-  var ecl  = document.getElementById('ecl').value;
+  var ecl  = 'M'; // EPC069-12 Spec schreibt M vor
 
   // QR rendern (mit Quiet Zone)
   var wrap = document.getElementById('qr-canvas');
@@ -1002,8 +960,7 @@ function generate() {
     + ' &nbsp;·&nbsp; '
     + fields.iban
     + ' &nbsp;·&nbsp; '
-    + fields.amount.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' EUR'
-    + (fields.info ? '<br>' + fields.info : '');
+    + fields.amount.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' EUR';
 
   // Rohdaten
   document.getElementById('raw-box').textContent = epc;
